@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.text.ParseException;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Properties;
 
@@ -13,15 +14,16 @@ public class DhtNode {
     public static final String HASH_ALGORITHM = "SHA-1";
     public static final int MAX_NODES = 32;
     public static final int MAX_ID = MAX_NODES - 1;
-    private final String PROP_FILE_NAME = "config.properties";
     private final int STREAM_BUFFER_SIZE = 8192;
-
     private Hashtable<Integer, String> DHTFragment;
+
     private String nodeName;
     private int port;
     private int referenceNodePort;
     private boolean isSetup;
     private boolean isFirst;
+
+    private static String propFileName = System.getProperty("configFile", "config.properties");
 
     private int nodeId;
     private int predecessorId;
@@ -90,13 +92,13 @@ public class DhtNode {
         if(this.successorId == -1){
             this.successorId = message.getFromNodeId();
             this.successorPort = message.getFromPort();
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.SUCCESSOR, nodeId);
+            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, nodeId);
         } else if((message.getFromNodeId() < this.successorId) && (message.getFromNodeId() > this.nodeId)) {
             this.successorId = message.getFromNodeId();
             this.successorPort = message.getFromPort();
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.SUCCESSOR, successorId);
+            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successorId);
         } else {
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.SUCCESSOR, succ(message.getFromNodeId() + 1));
+            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, succ(message.getFromNodeId() + 1));
 
         }
         return 0;
@@ -291,9 +293,17 @@ public class DhtNode {
         }
     }
 
+    public String getPropFileName() {
+        return propFileName;
+    }
+
+    public static void setPropFileName(String prop_file_name) {
+        DhtNode.propFileName = prop_file_name;
+    }
+
     private void loadConfig() {
         Properties prop = new Properties();
-        String propFileName = PROP_FILE_NAME;
+        String propFileName = getPropFileName();
         InputStream inputStream = null;
         try {
             inputStream = new FileInputStream(propFileName);
@@ -308,7 +318,7 @@ public class DhtNode {
 
         try {
             nodeName = Utils.getSafeProperty(prop, "nodeName");
-            port = Integer.parseInt(Utils.getSafeProperty(prop, "port"));
+            port = Integer.parseInt(Utils.getSafeProperty(prop, "fromPort"));
             referenceNodePort = Integer.parseInt(Utils.getSafeProperty(prop, "referenceNodePort"));
             isSetup = Boolean.parseBoolean(Utils.getSafeProperty(prop, "isSetup"));
             if (isSetup) {
