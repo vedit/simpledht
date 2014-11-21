@@ -101,8 +101,8 @@ public class Utils {
         return result;
     }
 
-    public static int randomPort(){
-        return randInt(50000,60000);
+    public static int randomPort() {
+        return randInt(50000, 60000);
     }
 
     public static int randInt(int min, int max) {

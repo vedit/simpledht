@@ -1,17 +1,14 @@
 package com.isikun.firat.dht.simplified;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.text.ParseException;
+import com.google.gson.Gson;
 
 /**
  * Created by hexenoid on 10/13/14.
  */
-public class DhtMessage{
+public class DhtMessage implements Serializable {
     private int fromNodeId;
     private int toNodeId;
     private int action;
@@ -23,19 +20,20 @@ public class DhtMessage{
 
     public static final int TYPE_SUCCESSOR = 1;
     public static final int TYPE_PREDECESSOR = 2;
-    
+
     public static final int ACTION_LEAVING = -1;
     public static final int ACTION_BOOTSTRAPPING = 1;
     public static final int ACTION_ENTRY = 2;
-    public static final int ACTION_INSYNC = 3;
+    public static final int ACTION_ACK = 3;
     public static final int ACTION_FIND = 4;
     public static final int ACTION_UPDATE = 5;
+    public static final int ACTION_ERROR = 666;
 
-    public DhtMessage(){
+    public DhtMessage() {
 
     }
 
-    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort){
+    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort) {
         this.fromNodeId = fromNodeId;
         this.toNodeId = toNodeId;
         this.action = action;
@@ -73,77 +71,67 @@ public class DhtMessage{
         this.payloadOwnerPort = payloadOwnerPort;
     }
 
-    public static DhtMessage parseMessage(String message) throws ParseException {
-        String[] parts = message.split(",");
-        DhtMessage parsedMessage = new DhtMessage();
-        for(String part: parts){
-            String[] value = part.split(":");
-            if (value[0].equals("fromNodeId")) {
-                parsedMessage.setFromNodeId(Integer.parseInt(value[1]));
-            } else if (value[0].equals("toNodeId")) {
-                parsedMessage.setToNodeId(Integer.parseInt(value[1]));
-            }  else if (value[0].equals("action")) {
-                parsedMessage.setAction(Integer.parseInt(value[1]));
-            } else if (value[0].equals("fromPort")) {
-                parsedMessage.setFromPort(Integer.parseInt(value[1]));
-            } else if (value[0].equals("toPort")) {
-                parsedMessage.setToPort(Integer.parseInt(value[1]));
-            } else if (value[0].equals("type")) {
-                parsedMessage.setType(Integer.parseInt(value[1]));
-            } else if (value[0].equals("payLoad")) {
-                parsedMessage.setPayLoad(Integer.parseInt(value[1]));
-            } else if (value[0].equals("payLoadOwnerPort")) {
-                parsedMessage.setPayloadOwnerPort(Integer.parseInt(value[1]));
-            } else if (value[0].equals("default")) {
-                throw new ParseException("Problem parsing property name: " + value[0], 0);
-            }
-        }
-        return parsedMessage;
-    }
-
-    public static DhtMessage sendMessage(DhtMessage request){
+    public DhtMessage sendMessage() {
         Socket clientSocket = null;
         PrintWriter socketOut = null;
         BufferedReader socketIn = null;
         String host = "127.0.0.1";
+//        System.out.println(request);
         try {
             //create socket and connect to the server
-            clientSocket = new Socket(host, request.getToPort());
+            clientSocket = new Socket(host, this.getToPort());
             //will use socketOut to send text to the server over the socket
             socketOut = new PrintWriter(clientSocket.getOutputStream(), true);
             //will use socketIn to receive text from the server over the socket
             socketIn = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        } catch(UnknownHostException e) { //if serverName cannot be resolved to an address
+        } catch (UnknownHostException e) { //if serverName cannot be resolved to an address
             System.out.println("Who is " + host + "?");
             e.printStackTrace();
-            System.exit(0);
         } catch (IOException e) {
             System.out.println("Cannot get I/O for the connection.");
             e.printStackTrace();
-            System.exit(0);
         }
-        socketOut.println(request.toString());
         DhtMessage response = null;
-        try {
-            response = DhtMessage.parseMessage(socketIn.readLine());
-            System.out.println(response);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
-            e.printStackTrace();
+        if (socketOut != null && socketIn != null) {
+            socketOut.println(DhtMessage.serialize(this));
+            try {
+                response = DhtMessage.deserialize(socketIn.readLine());
+//                System.out.println(response);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            socketOut.close();
+            try {
+                socketIn.close();
+                clientSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        socketOut.close();
-        try {
-            socketIn.close();
-            clientSocket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (socketIn == null) {
+            System.out.println("SocketOut is null");
+        }
+        if (socketOut == null) {
+            System.out.println("SocketIn is null");
         }
         return response;
     }
 
-    public String toString(){
-        return "fromNodeId:"+fromNodeId + ",toNodeId:"+toNodeId + ",action:"+action + ",fromPort:"+fromPort + ",toPort:"+toPort + ",type:"+type + ",payLoad:"+ payLoad + ",payloadOwnerPort:"+payloadOwnerPort;
+    public static String serialize(DhtMessage message){
+        Gson gson = new Gson();
+        String json = gson.toJson(message);
+        System.out.println(json);
+        return json;
+    }
+
+    public static DhtMessage deserialize(String message){
+        Gson gson = new Gson();
+        System.out.println(message);
+        return gson.fromJson(message, DhtMessage.class);
+    }
+
+    public String toString() {
+        return serialize(this);
     }
 
     public int getFromNodeId() {
@@ -177,6 +165,7 @@ public class DhtMessage{
     public void setAction(int action) {
         this.action = action;
     }
+
     public int getToNodeId() {
         return toNodeId;
     }
@@ -208,4 +197,5 @@ public class DhtMessage{
     public void setPayloadOwnerPort(int payloadOwnerPort) {
         this.payloadOwnerPort = payloadOwnerPort;
     }
+
 }
