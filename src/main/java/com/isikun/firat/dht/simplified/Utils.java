@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.Random;
+import java.security.SecureRandom;
 
 public class Utils {
 
@@ -128,5 +129,11 @@ public class Utils {
         int randomNum = rand.nextInt((max - min) + 1) + min;
 
         return randomNum;
+    }
+
+
+    public static String randomHash() {
+        SecureRandom random = new SecureRandom();
+        return new BigInteger(130, random).toString(32);
     }
 }

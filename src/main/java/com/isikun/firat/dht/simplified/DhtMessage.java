@@ -4,7 +4,6 @@ import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import com.google.gson.Gson;
-import org.apache.commons.codec.binary.Base64;
 
 /**
  * Created by hexenoid on 10/13/14.
@@ -18,6 +17,7 @@ public class DhtMessage implements Serializable {
     private int type;
     private String payLoad;
     private int payloadOwnerPort;
+    private String callback;
 
     public static final int TYPE_SUCCESSOR = 1;
     public static final int TYPE_PREDECESSOR = 2;
@@ -73,6 +73,18 @@ public class DhtMessage implements Serializable {
         this.payloadOwnerPort = payloadOwnerPort;
     }
 
+    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort, int type, String payLoad, int payloadOwnerPort, String callback) {
+        this.fromNodeId = fromNodeId;
+        this.toNodeId = toNodeId;
+        this.action = action;
+        this.type = type;
+        this.fromPort = fromPort;
+        this.toPort = toPort;
+        this.payLoad = payLoad;
+        this.payloadOwnerPort = payloadOwnerPort;
+        this.callback = callback;
+    }
+
     public DhtMessage sendMessage() {
         Socket clientSocket = null;
         PrintWriter socketOut = null;
@@ -91,7 +103,7 @@ public class DhtMessage implements Serializable {
             e.printStackTrace();
         }  catch (IOException e){ //put it back to queue
             System.out.println("Cannot Connect to " + this.getToNodeId() + ":" + this.getToPort());
-            DhtNode.getQueue().offer(this); //
+            DhtNode.getMessageQueue().offer(this); //
         }
         DhtMessage response = null;
         if (socketOut != null && socketIn != null) {
@@ -200,4 +212,11 @@ public class DhtMessage implements Serializable {
         this.payloadOwnerPort = payloadOwnerPort;
     }
 
+    public String getCallback() {
+        return callback;
+    }
+
+    public void setCallback(String callback) {
+        this.callback = callback;
+    }
 }

@@ -65,33 +65,39 @@ public class WorkerThread implements Runnable {
         switch (request.getAction()) {
             case DhtMessage.ACTION_ENTRY:
                 ezLog(node.getNodeId(),request.getFromNodeId(), "ENTRY");
-                node.getQueue().offer(node.updateSuccessor(request));
-                node.getQueue().offer(node.updatePredecessor(request));
+                node.getMessageQueue().offer(node.updateSuccessor(request));
+                node.getMessageQueue().offer(node.updatePredecessor(request));
                 response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
                 //node.updatePredecessor(request);
                 break;
             case DhtMessage.ACTION_UPDATE:
                 ezLog(node.getNodeId(), request.getFromNodeId(), "UPDATE");
-                node.getQueue().offer(node.processUpdateAction(request));
+                node.getMessageQueue().offer(node.processUpdateAction(request));
                 response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
                 break;
             case DhtMessage.ACTION_FILE_SEND:
                 ezLog(node.getNodeId(), request.getFromNodeId(), "FILE");
-//                node.getQueue().offer(node.processUpdateAction(request));
+//                node.getMessageQueue().offer(node.processUpdateAction(request));
                 if(node.processReceivedPayload(request.getPayLoad())){
                     response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
                 } else {
                     response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ERROR, node.getPort(), request.getFromPort());
                 }
                 break;
+
+            case DhtMessage.ACTION_FIND: //SUCCESSOR QUERY
+                ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
+                System.out.println(response);
+                if(request.getType() == DhtMessage.TYPE_SUCCESSOR){
+                    node.succ(Integer.parseInt(request.getPayLoad()));
+                } else if (request.getType() == DhtMessage.TYPE_PREDECESSOR){
+                    System.out.println("PREDECESSOR FIND?");
+                }
+                break;
             case DhtMessage.ACTION_BOOTSTRAPPING:
                 ezLog(node.getNodeId(),request.getFromNodeId(), "BOOTSTRAP");
                 System.out.println(request.getFromNodeId());
                 response = bootstrapNode(request);
-                break;
-            case DhtMessage.ACTION_FIND:
-                ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
-//                    response = findNode(request);
                 break;
             case DhtMessage.ACTION_LEAVING:
                 ezLog(node.getNodeId(),request.getFromNodeId(), "LEAVE");
