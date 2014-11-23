@@ -4,6 +4,7 @@ kill_processes() {
 }
 
 reset_folders() {
+  mkdir -p data$1
   rm data$1/*
 }
 kill_processes
