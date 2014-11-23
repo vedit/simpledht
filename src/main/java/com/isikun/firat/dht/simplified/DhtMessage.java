@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import com.google.gson.Gson;
+import org.apache.commons.codec.binary.Base64;
 
 /**
  * Created by hexenoid on 10/13/14.
@@ -15,17 +16,18 @@ public class DhtMessage implements Serializable {
     private int fromPort;
     private int toPort;
     private int type;
-    private int payLoad;
+    private String payLoad;
     private int payloadOwnerPort;
 
     public static final int TYPE_SUCCESSOR = 1;
     public static final int TYPE_PREDECESSOR = 2;
 
     public static final int ACTION_LEAVING = -1;
-    public static final int ACTION_BOOTSTRAPPING = 1;
     public static final int ACTION_ENTRY = 2;
     public static final int ACTION_ACK = 3;
     public static final int ACTION_FIND = 4;
+    public static final int ACTION_FILE_SEND = 6;
+    public static final int ACTION_BOOTSTRAPPING = 1;
     public static final int ACTION_UPDATE = 5;
     public static final int ACTION_ERROR = 666;
 
@@ -50,7 +52,7 @@ public class DhtMessage implements Serializable {
         this.toPort = toPort;
     }
 
-    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort, int type, int payLoad) {
+    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort, int type, String payLoad) {
         this.fromNodeId = fromNodeId;
         this.toNodeId = toNodeId;
         this.action = action;
@@ -60,7 +62,7 @@ public class DhtMessage implements Serializable {
         this.payLoad = payLoad;
     }
 
-    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort, int type, int payLoad, int payloadOwnerPort) {
+    public DhtMessage(int fromNodeId, int toNodeId, int action, int fromPort, int toPort, int type, String payLoad, int payloadOwnerPort) {
         this.fromNodeId = fromNodeId;
         this.toNodeId = toNodeId;
         this.action = action;
@@ -87,9 +89,9 @@ public class DhtMessage implements Serializable {
         } catch (UnknownHostException e) { //if serverName cannot be resolved to an address
             System.out.println("Who is " + host + "?");
             e.printStackTrace();
-        } catch (IOException e) {
-            System.out.println("Cannot get I/O for the connection.");
-            e.printStackTrace();
+        }  catch (IOException e){ //put it back to queue
+            System.out.println("Cannot Connect to " + this.getToNodeId() + ":" + this.getToPort());
+            DhtNode.getQueue().offer(this); //
         }
         DhtMessage response = null;
         if (socketOut != null && socketIn != null) {
@@ -120,13 +122,13 @@ public class DhtMessage implements Serializable {
     public static String serialize(DhtMessage message){
         Gson gson = new Gson();
         String json = gson.toJson(message);
-        System.out.println(json);
+//        System.out.println(json);
         return json;
     }
 
     public static DhtMessage deserialize(String message){
         Gson gson = new Gson();
-        System.out.println(message);
+//        System.out.println(message);
         return gson.fromJson(message, DhtMessage.class);
     }
 
@@ -174,11 +176,11 @@ public class DhtMessage implements Serializable {
         this.toNodeId = toNodeId;
     }
 
-    public int getPayLoad() {
+    public String getPayLoad() {
         return payLoad;
     }
 
-    public void setPayLoad(int payLoad) {
+    public void setPayLoad(String payLoad) {
         this.payLoad = payLoad;
     }
 

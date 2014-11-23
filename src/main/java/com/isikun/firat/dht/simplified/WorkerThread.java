@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.text.ParseException;
 // Thread for sending messages
 public class WorkerThread implements Runnable {
 
@@ -20,7 +19,6 @@ public class WorkerThread implements Runnable {
         PrintWriter socketOut = null;
         BufferedReader socketIn = null;
         DhtNode node = DhtNode.getInstance();
-
         try {
             //will use socketOut to send text to the server over the socket
             socketOut = new PrintWriter(clientSocket.getOutputStream(), true);
@@ -40,38 +38,8 @@ public class WorkerThread implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         if (request != null) {
-            switch (request.getAction()) {
-                case DhtMessage.ACTION_ENTRY:
-                    ezLog(node.getNodeId(),request.getFromNodeId(), "ENTRY");
-                    DhtNode.getQueue().offer(node.updateSuccessor(request));
-                    DhtNode.getQueue().offer(node.updatePredecessor(request));
-                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
-                    //node.updatePredecessor(request);
-                    break;
-                case DhtMessage.ACTION_UPDATE:
-                    ezLog(node.getNodeId(), request.getFromNodeId(), "UPDATE");
-                    DhtNode.getQueue().offer(node.processUpdate(request));
-                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
-                    break;
-                case DhtMessage.ACTION_BOOTSTRAPPING:
-                    ezLog(node.getNodeId(),request.getFromNodeId(), "BOOTSTRAP");
-                    System.out.println(request.getFromNodeId());
-                    response = bootstrapNode(request);
-                    break;
-                case DhtMessage.ACTION_FIND:
-                    ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
-//                    response = findNode(request);
-                    break;
-                case DhtMessage.ACTION_LEAVING:
-                    ezLog(node.getNodeId(),request.getFromNodeId(), "LEAVE");
-                    break;
-                case DhtMessage.ACTION_ACK:
-                    ezLog(node.getNodeId(), request.getFromNodeId(), "ACK");
-                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
-                    break;
-            }
+            response = processResponse(request);
         } else {
             System.out.println("Request is null");
         }
@@ -91,18 +59,58 @@ public class WorkerThread implements Runnable {
         }
     }
 
+    public DhtMessage processResponse(DhtMessage request) {
+        DhtNode node = DhtNode.getInstance();
+        DhtMessage response = null;
+        switch (request.getAction()) {
+            case DhtMessage.ACTION_ENTRY:
+                ezLog(node.getNodeId(),request.getFromNodeId(), "ENTRY");
+                node.getQueue().offer(node.updateSuccessor(request));
+                node.getQueue().offer(node.updatePredecessor(request));
+                response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                //node.updatePredecessor(request);
+                break;
+            case DhtMessage.ACTION_UPDATE:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "UPDATE");
+                node.getQueue().offer(node.processUpdateAction(request));
+                response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                break;
+            case DhtMessage.ACTION_FILE_SEND:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "FILE");
+//                node.getQueue().offer(node.processUpdateAction(request));
+                if(node.processReceivedPayload(request.getPayLoad())){
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                } else {
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ERROR, node.getPort(), request.getFromPort());
+                }
+                break;
+            case DhtMessage.ACTION_BOOTSTRAPPING:
+                ezLog(node.getNodeId(),request.getFromNodeId(), "BOOTSTRAP");
+                System.out.println(request.getFromNodeId());
+                response = bootstrapNode(request);
+                break;
+            case DhtMessage.ACTION_FIND:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
+//                    response = findNode(request);
+                break;
+            case DhtMessage.ACTION_LEAVING:
+                ezLog(node.getNodeId(),request.getFromNodeId(), "LEAVE");
+                break;
+            case DhtMessage.ACTION_ACK:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "ACK");
+                response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                break;
+        }
+        return response;
+    }
+
     public void ezLog(int node, int from, String action){
         System.out.println("NODE " + node + " RECEIVED "+ action+" FROM " + from);
     }
+
     private DhtMessage bootstrapNode(DhtMessage message) {
         DhtNode node = DhtNode.getInstance();
         node.updateSuccessor(message);
-        return new DhtMessage();
-    }
-
-    private DhtMessage findNode(DhtMessage message) {
-        DhtNode node = DhtNode.getInstance();
-        int successor = node.succ(message.getPayLoad());
         return new DhtMessage();
     }
 }

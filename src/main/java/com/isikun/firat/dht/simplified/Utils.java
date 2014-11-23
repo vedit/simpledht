@@ -1,5 +1,7 @@
 package com.isikun.firat.dht.simplified;
 
+import org.apache.commons.codec.binary.Base64;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -101,8 +103,18 @@ public class Utils {
         return result;
     }
 
-    public static int randomPort() {
-        return randInt(50000, 60000);
+    public static String encodePayload(String payload){
+        byte[] encodedBytes = Base64.encodeBase64(payload.getBytes());
+        String encodedPayload = new String(encodedBytes);
+        System.out.println("encodedBytes: " + encodedPayload);
+        return encodedPayload;
+    }
+
+    public static String decodePayload(String encodedBytes){
+        byte[] decodedPayload = Base64.decodeBase64(encodedBytes);
+        String payload = new String(decodedPayload);
+        System.out.println("decodedBytes: " + payload);
+        return payload;
     }
 
     public static int randInt(int min, int max) {
