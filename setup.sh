@@ -8,7 +8,7 @@ launch_node (){
   echo "Press any key to continue..."
   read -n 1
   mvn exec:java -D exec.mainClass=com.isikun.firat.dht.simplified.Main -DconfigFile=config$1.properties &
-  sleep 3
+  sleep 5
 }
 
 mvn clean install

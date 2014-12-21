@@ -2,10 +2,10 @@ package com.isikun.firat.dht.simplified;
 
 import com.google.gson.Gson;
 
-import javax.xml.soap.Node;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 
 public class DhtNode implements Serializable {
 
@@ -13,7 +13,7 @@ public class DhtNode implements Serializable {
     public static final int MAX_NODES = 32;
     public static final int MAX_ID = MAX_NODES - 1;
     private final int STREAM_BUFFER_SIZE = 8192;
-    private Hashtable<Integer, String> DHTFragment;
+    private Hashtable<Integer, FileRecord> DHTFragment;
 
     private String nodeName;
     private int port;
@@ -24,39 +24,29 @@ public class DhtNode implements Serializable {
 
     private static String propFileName = System.getProperty("configFile", "config1.properties");
 
+    private int nodeId;
     private NodeRecord successor;
     private NodeRecord predecessor;
-    private int nodeId;
-//    private int predecessorId;
-//    private int predecessorPort;
-//    private int successorId;
-//    private int successorPort;
 
     private static Queue<DhtMessage> messageQueue;
     private static QueueConsumer consumer;
+    private static ArrayList<String> callbackList;
 
     private ServerThread socketServer;
     //Singleton pattern
-    private static DhtNode INSTANCE;
+    private static DhtNode INSTANCE = new DhtNode();
 
     public static DhtNode getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new DhtNode();
-        }
         return INSTANCE;
     }
 
     private DhtNode() {
-        DHTFragment = new Hashtable<Integer, String>();
+        DHTFragment = new Hashtable<Integer, FileRecord>();
         messageQueue = new ConcurrentLinkedQueue<DhtMessage>();
         loadConfig();
         nodeId = Utils.getChecksum(nodeName, false);
         predecessor = new NodeRecord(nodeId, port);
         successor = new NodeRecord(nodeId, port);
-//        predecessorId = nodeId;
-//        successorId = nodeId;
-//        successorPort = referenceNodePort;
-//        predecessorPort = referenceNodePort;
         socketServer = new ServerThread(port);
         new Thread(socketServer).start();
         consumer = new QueueConsumer(messageQueue);
@@ -67,16 +57,23 @@ public class DhtNode implements Serializable {
     public NodeRecord succ(int k) {
         NodeRecord successorNode;
         if (nodeId == successor.getNodeId()) {
+            System.out.println(nodeId + " : succ branch 1");
             successorNode = successor;
         } else if (k == nodeId) {
+            System.out.println(nodeId + " : succ branch 2");
             successorNode = successor;
         } else if (isInInterval(k, predecessor.getNodeId(), successor.getNodeId())) {
+            System.out.println(nodeId + " : succ branch 3");
             successorNode = successor;
         } else {
+            System.out.println(nodeId + " : succ branch 4");
             //TODO BURDASIN
-            DhtMessage successorQuery = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_FIND, port, successor.getPort(), DhtMessage.TYPE_SUCCESSOR, k + "");
+            String callbackKey = Utils.randomHash();
+            callbackList.add(Utils.randomHash());
+            DhtMessage successorQuery = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_FIND, port, successor.getPort(), DhtMessage.TYPE_SUCCESSOR, k + "", port, callbackKey);
             System.out.println(successorQuery);
-            DhtMessage response = successorQuery.sendMessage();
+            getMessageQueue().offer(successorQuery);
+            DhtMessage response = waitForCallback(callbackKey);
             System.out.println(response);
             System.out.println("PAYLOAD: " + response.getPayLoad());
             successorNode = NodeRecord.deserialize(response.getPayLoad());
@@ -116,15 +113,18 @@ public class DhtNode implements Serializable {
         System.out.println(message);
 //        successorId = succ(Integer.parseInt(message.getPayLoad()));
         if (successor.getNodeId() == this.nodeId) { // if successor is not set optimization
+            System.out.println(nodeId + " : updateSucc branch 1");
             successor.setNodeId(message.getFromNodeId());
             successor.setPort(message.getFromPort());
             response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_PREDECESSOR, new NodeRecord(nodeId, port).serialize());
         } else if ((message.getFromNodeId() < successor.getNodeId()) && (message.getFromNodeId() > this.nodeId)) { //new successor without crossing 0
+            System.out.println(nodeId + " : updateSucc branch 2");
             successor = NodeRecord.deserialize(message.getPayLoad());
 //            this.successorId = Integer.parseInt(message.getPayLoad());
 //            this.successorPort = message.getPayloadOwnerPort();
             response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successor.serialize());
         } else { //Find the successor
+            System.out.println(nodeId + " : updateSucc branch 3");
             NodeRecord tempSuccessor = succ(message.getFromNodeId() + 1);
             response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, tempSuccessor.serialize());
         }
@@ -182,23 +182,23 @@ public class DhtNode implements Serializable {
         return response;
     }
 
-    private void insertToDHT(String itemName) {
-        int itemId = Utils.getChecksum(folder + "/" + itemName, true);
+    private void insertToDHT(FileRecord item) {
+        int itemId = Utils.getChecksum(folder + "/" + item.getFileName(), true);
 //        System.out.println("itemName: " + itemName + " - itemId: " + itemId);
-        DHTFragment.put(itemId, itemName);
+        DHTFragment.put(itemId, item);
     }
 
     private void removeFromDHT(int itemId) {
-        if (deleteFile(DHTFragment.get(itemId))) {
+        FileRecord file = DHTFragment.get(itemId);
+        if (file.deleteFile(folder)) {
             DHTFragment.remove(itemId);
         }
     }
 
     public String processSentPayload(int key) {
         Gson gson = new Gson();
-        String fileName = DHTFragment.get(key);
-        String fileContents = Utils.encodePayload(readFile(fileName));
-        String[] payload = {fileName, fileContents};
+        FileRecord payload = DHTFragment.get(key);
+        payload.setFileContents(Utils.encodePayload(payload.getFileContents()));
         String processedPayload = gson.toJson(payload);
         return processedPayload;
     }
@@ -206,62 +206,28 @@ public class DhtNode implements Serializable {
     public boolean processReceivedPayload(String processedPayload) {
         boolean result = false;
         Gson gson = new Gson();
-        String[] payload = gson.fromJson(processedPayload, String[].class);
-        if (saveFile(payload)) {
-            insertToDHT(payload[0]);
-            System.out.println(payload[0] + " : " + payload[1] + " is saved");
+        FileRecord payload = gson.fromJson(processedPayload, FileRecord.class);
+        if (payload.saveFile(folder)) {
+            insertToDHT(payload);
+            System.out.println(payload.getFileName() + " : " + payload.getFileContents() + " is saved");
             result = true;
         }
         return result;
     }
 
-    public String readFile(String fileName) {
-        String fileContents = null;
-        try (BufferedReader br = new BufferedReader(new FileReader(folder + "/" + fileName))) {
-            StringBuilder sb = new StringBuilder();
-            String line = br.readLine();
 
-            while (line != null) {
-                sb.append(line);
-                sb.append(System.lineSeparator());
-                line = br.readLine();
-            }
-            fileContents = sb.toString();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return fileContents;
-    }
-
-    public boolean saveFile(String[] payload) {
-        boolean result = false;
+    public DhtMessage waitForCallback(String callback){
+        DhtMessage response;
+        final CountDownLatch latch = new CountDownLatch(1);
+        ResponseListener responseListener = new ResponseListener(latch, callback);
+        new Thread(responseListener).start();
         try {
-            PrintWriter writer = new PrintWriter(folder + "/" + payload[0], "UTF-8");
-            writer.println(Utils.decodePayload(payload[1]));
-            writer.close();
-            result = true;
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (UnsupportedEncodingException e) {
+            latch.await();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return result;
-    }
-
-    public boolean deleteFile(String fileName) {
-        boolean result = false;
-        try {
-            File file = new File(folder + "/" + fileName);
-            if (file.delete()) {
-                System.out.println(file.getName() + " is deleted!");
-                result = true;
-            } else {
-                System.out.println("Delete operation is failed.");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return result;
+        response = responseListener.getResponse();
+        return response;
     }
 
     public List<Integer> getFileKeys() {
@@ -334,7 +300,7 @@ public class DhtNode implements Serializable {
                 if (isFirst) {
                     String[] items = Utils.getSafeProperty(prop, "items").split(",");
                     for (String item : items) { // add initial items to dht
-                        insertToDHT(item);
+                        insertToDHT(new FileRecord(item, folder, true));
                     }
                 }
             }
@@ -373,4 +339,5 @@ public class DhtNode implements Serializable {
     public static Queue<DhtMessage> getMessageQueue() {
         return messageQueue;
     }
+
 }

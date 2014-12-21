@@ -5,9 +5,10 @@ import java.util.Queue;
 /**
  * Created by hexenoid on 11/20/14.
  */
-public class QueueConsumer implements Runnable {
+public class QueueConsumer implements Runnable{
 
     Queue<DhtMessage> queue;
+    private ResponseReceivedEvent asyncResponse;
 
     public QueueConsumer (Queue queue){
         this.queue = queue;
@@ -18,7 +19,8 @@ public class QueueConsumer implements Runnable {
         while(true){
             if(queue.peek() != null){
                 DhtMessage message = queue.poll();
-                message.sendMessage();
+                DhtMessage response = message.sendMessage();
+                asyncResponse.responseReceivedEvent(response);
             }
             try{
                 Thread.sleep(1000);
