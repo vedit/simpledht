@@ -6,7 +6,7 @@ import com.google.gson.Gson;
 /**
  * Created by hexenoid on 11/23/14.
  */
-public class NodeRecord implements Serializable{
+public class NodeRecord implements Serializable, Comparable<NodeRecord>{
     private int nodeId;
     private int port;
 
@@ -45,6 +45,19 @@ public class NodeRecord implements Serializable{
         Gson gson = new Gson();
 //        System.out.println(message);
         return gson.fromJson(noderecord, NodeRecord.class);
+    }
+
+    @Override
+    public String toString(){
+        return this.serialize();
+    }
+
+    // Returns positive when first is bigger
+    // Negative when second is bigger
+    // 0 when they are the same
+    @Override
+    public int compareTo(NodeRecord nodeRecord){
+        return nodeId - nodeRecord.getNodeId();
     }
 
 }

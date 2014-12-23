@@ -10,7 +10,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class DhtNode implements Serializable {
 
     public static final String HASH_ALGORITHM = "SHA-1";
-    public static final int MAX_NODES = 32;
+    public static final int KEY_SPACE = 5;
+    public static final int MAX_NODES = (int)Math.pow(KEY_SPACE, 2);
     public static final int MAX_ID = MAX_NODES - 1;
     private final int STREAM_BUFFER_SIZE = 8192;
     private Hashtable<Integer, String> DHTFragment;
@@ -24,13 +25,9 @@ public class DhtNode implements Serializable {
 
     private static String propFileName = System.getProperty("configFile", "config1.properties");
 
-    private NodeRecord successor;
-    private NodeRecord predecessor;
+    private static NodeRecord successor;
+    private static NodeRecord predecessor;
     private int nodeId;
-//    private int predecessorId;
-//    private int predecessorPort;
-//    private int successorId;
-//    private int successorPort;
 
     private static Queue<DhtMessage> messageQueue;
     private static QueueConsumer consumer;
@@ -39,7 +36,7 @@ public class DhtNode implements Serializable {
     //Singleton pattern
     private static DhtNode INSTANCE;
 
-    public static DhtNode getInstance() {
+    public synchronized static DhtNode getInstance() {
         if (INSTANCE == null) {
             INSTANCE = new DhtNode();
         }
@@ -51,37 +48,47 @@ public class DhtNode implements Serializable {
         messageQueue = new ConcurrentLinkedQueue<DhtMessage>();
         loadConfig();
         nodeId = Utils.getChecksum(nodeName, false);
+        System.out.println("=== Node ID: " + nodeId + "===");
         predecessor = new NodeRecord(nodeId, port);
         successor = new NodeRecord(nodeId, port);
-//        predecessorId = nodeId;
-//        successorId = nodeId;
-//        successorPort = referenceNodePort;
-//        predecessorPort = referenceNodePort;
         socketServer = new ServerThread(port);
         new Thread(socketServer).start();
         consumer = new QueueConsumer(messageQueue);
         new Thread(consumer).start();
-        enterRing();
+        if(!isFirst){
+            enterRing();
+        }
     }
 
-    public NodeRecord succ(int k) {
+    public synchronized NodeRecord succ(int k) {
         NodeRecord successorNode;
-        if (nodeId == successor.getNodeId()) {
+        System.out.println("SUCC\nPREDECESSOR:" + predecessor);
+        System.out.println("SUCCESSOR:" + successor);
+        System.out.println("K:" + k);
+        if (nodeId == successor.getNodeId()) { // Init optimization
+            System.out.println("SUCCC1");
             successorNode = successor;
         } else if (k == nodeId) {
+            System.out.println("SUCCC2");
             successorNode = successor;
-        } else if (isInInterval(k, predecessor.getNodeId(), successor.getNodeId())) {
+        } else if (isInInterval(k, nodeId, successor.getNodeId())) {
+            System.out.println("SUCCC3");
             successorNode = successor;
         } else {
+            System.out.println("SUCCC5");
             //TODO BURDASIN
             DhtMessage successorQuery = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_FIND, port, successor.getPort(), DhtMessage.TYPE_SUCCESSOR, k + "");
             System.out.println(successorQuery);
             DhtMessage response = successorQuery.sendMessage();
             System.out.println(response);
             System.out.println("PAYLOAD: " + response.getPayLoad());
-            successorNode = NodeRecord.deserialize(response.getPayLoad());
+            successorNode = response.payloadToNodeRecord();
         }
         return successorNode;
+    }
+
+    public NodeRecord pred(){
+        return predecessor;
     }
 
     private int lookup(int k) {
@@ -94,10 +101,9 @@ public class DhtNode implements Serializable {
 
     private boolean enterRing() {
         boolean result = false;
-        DhtMessage successorQuery = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_ENTRY, port, referenceNodePort, DhtMessage.TYPE_SUCCESSOR, new NodeRecord(nodeId, port).serialize());
-        DhtMessage response = successorQuery.sendMessage();
-//        result = response.getPayLoad();
-//        successorPort = result;
+        DhtMessage initQuery = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_ENTRY, port, referenceNodePort, DhtMessage.TYPE_SUCCESSOR, new NodeRecord(nodeId, port).serialize());
+        DhtMessage response = initQuery.sendMessage();
+        processUpdateAction(response);
         return result;
     }
 
@@ -107,79 +113,128 @@ public class DhtNode implements Serializable {
     }
 
     private int stabilize() {
-
+        // pred(succ(this.getNodeId() + 1))
         return 0;
     }
 
-    public DhtMessage updateSuccessor(DhtMessage message) {
-        DhtMessage response = null;
-        System.out.println(message);
-//        successorId = succ(Integer.parseInt(message.getPayLoad()));
-        if (successor.getNodeId() == this.nodeId) { // if successor is not set optimization
-            successor.setNodeId(message.getFromNodeId());
-            successor.setPort(message.getFromPort());
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_PREDECESSOR, new NodeRecord(nodeId, port).serialize());
-        } else if ((message.getFromNodeId() < successor.getNodeId()) && (message.getFromNodeId() > this.nodeId)) { //new successor without crossing 0
-            successor = NodeRecord.deserialize(message.getPayLoad());
-//            this.successorId = Integer.parseInt(message.getPayLoad());
-//            this.successorPort = message.getPayloadOwnerPort();
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successor.serialize());
-        } else { //Find the successor
-            NodeRecord tempSuccessor = succ(message.getFromNodeId() + 1);
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, tempSuccessor.serialize());
-        }
-//        let our successor know we are her predecessor
-//        response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_PREDECESSOR, nodeId + "");
-        for (int key : getFileKeys()) {
-            if (isInInterval(key, nodeId, successor.getNodeId())) {
-                sendItem(key);
-            }
-        }
-        return response;
-    }
-
-    public DhtMessage updatePredecessor(DhtMessage message) {
-        // TODO same as updatesuccessor currently
+    public synchronized DhtMessage bootstrapNode(DhtMessage message){
         DhtMessage response;
-        if (predecessor.getNodeId() == this.nodeId) { // if successor is not set optimization
-            predecessor.setNodeId(message.getFromNodeId());
-            predecessor.setPort(message.getFromPort());
-            // let our successor know we are her successor
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, new NodeRecord(nodeId, port).serialize());
-        } else if ((message.getFromNodeId() < successor.getNodeId()) && (message.getFromNodeId() > this.nodeId)) { //new successor without crossing 0
-            predecessor.setPort(message.getFromPort());
-            predecessor.setNodeId(message.getFromNodeId());
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successor.serialize());
-        } else { //Find the successor
-            response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, succ(message.getFromNodeId() + 1).serialize());
-
-        }
+        NodeRecord successor = succ(message.getFromNodeId() + 1);
+        response = new DhtMessage(nodeId, message.getFromNodeId(), DhtMessage.ACTION_UPDATE, port, message.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successor.serialize());
         return response;
     }
 
-    public DhtMessage processUpdateAction(DhtMessage request) {
+    public boolean updatePredecessor(NodeRecord potentialPredecessor){
+        boolean result = false;
+        System.out.println("this.toNodeRecord().compareTo(predecessor): " + this.toNodeRecord().compareTo(predecessor));
+        if (isInInterval(potentialPredecessor.getNodeId(), predecessor.getNodeId(), nodeId)){
+            predecessor = potentialPredecessor;
+            result = true;
+        } else if (this.toNodeRecord().compareTo(predecessor) == 0){
+            predecessor = potentialPredecessor;
+            result = true;
+        }
+        return result;
+    }
+
+    public boolean updateSuccessor(NodeRecord potentialSuccessor){
+        boolean result = false;
+        System.out.println("this.toNodeRecord().compareTo(successor): " + this.toNodeRecord().compareTo(successor));
+        if (isInInterval(potentialSuccessor.getNodeId(), nodeId, successor.getNodeId())){
+            successor = potentialSuccessor;
+            result = true;
+        } else if (this.toNodeRecord().compareTo(successor) == 0){
+            successor = potentialSuccessor;
+            result = true;
+        }
+        return result;
+    }
+
+    public synchronized DhtMessage processUpdateAction(DhtMessage request) {
         DhtMessage response = null;
         if (request.getAction() == DhtMessage.ACTION_UPDATE) {
             switch (request.getType()) {
                 case DhtMessage.TYPE_PREDECESSOR:
-                    NodeRecord tempPred= NodeRecord.deserialize(request.getPayLoad());
-                    predecessor.setNodeId(tempPred.getNodeId());
-                    System.out.println("Node " + nodeId + " predecessor is now " + predecessor.getNodeId());
+                    NodeRecord prevPredecessor = predecessor;
+                    if (updatePredecessor(request.payloadToNodeRecord())){
+                        System.out.println("Node " + nodeId + " predecessor is now " + predecessor.getNodeId());
+                        // Let our previous precessor know its new successor
+                        DhtMessage updatePredecessor;
+                        if(predecessor.compareTo(this.toNodeRecord()) == 0){
+                            updatePredecessor = new DhtMessage(nodeId, prevPredecessor.getNodeId(), DhtMessage.ACTION_UPDATE, port, prevPredecessor.getPort(), DhtMessage.TYPE_SUCCESSOR, predecessor.serialize());
+                        } else { // Initialization handling
+                            updatePredecessor = new DhtMessage(nodeId, predecessor.getNodeId(), DhtMessage.ACTION_UPDATE, port, predecessor.getPort(), DhtMessage.TYPE_SUCCESSOR, prevPredecessor.serialize());
+                        }
+                        messageQueue.offer(updatePredecessor);
+                    }
                     response = new DhtMessage(nodeId, request.getFromNodeId(), DhtMessage.ACTION_ACK, port, request.getFromPort());
                     break;
                 case DhtMessage.TYPE_SUCCESSOR:
-                    NodeRecord tempSucc= NodeRecord.deserialize(request.getPayLoad());
-                    successor.setNodeId(tempSucc.getNodeId());
-                    System.out.println("Node " + nodeId + " successor is now " + successor.getNodeId());
+                    NodeRecord prevSuccessor = successor;
+                    if (updateSuccessor(request.payloadToNodeRecord())){
+                        System.out.println("Node " + nodeId + " successor is now " + successor.getNodeId());
+                        // Let our previous successor know its new pred
+                        DhtMessage updateSuccessor;
+                        if(successor.compareTo(this.toNodeRecord()) == 0) {
+                            updateSuccessor = new DhtMessage(nodeId, prevSuccessor.getNodeId(), DhtMessage.ACTION_UPDATE, port, prevSuccessor.getPort(), DhtMessage.TYPE_PREDECESSOR, successor.serialize());
+                        } else { //Initialization handling
+                            updateSuccessor = new DhtMessage(nodeId, successor.getNodeId(), DhtMessage.ACTION_UPDATE, port, successor.getPort(), DhtMessage.TYPE_PREDECESSOR, prevSuccessor.serialize());
+                        }
+                        messageQueue.offer(updateSuccessor);
+                        for (int key : getFileKeys()) {
+                            if (isInInterval(key, nodeId, successor.getNodeId())) {
+                                sendItem(key);
+                            }
+                        }
+                    }
                     response = new DhtMessage(nodeId, request.getFromNodeId(), DhtMessage.ACTION_ACK, port, request.getFromPort());
                     break;
                 default:
                     response = new DhtMessage(nodeId, request.getFromNodeId(), DhtMessage.ACTION_ERROR, port, request.getFromPort());
                     break;
             }
-
         }
+        System.out.println("SUCCESSOR:" + successor);
+        System.out.println("PRECESSOR:" + predecessor);
         return response;
+    }
+
+    public boolean isInInterval(int key, int fromId, int toId) {
+        System.out.println("key:" + key + " from:"+ fromId +" to:" + toId);
+        boolean result;
+        // both interval bounds are equal -> calculate out of equals
+        if (fromId == toId) {
+            System.out.println("EQUAL INTERVAL");
+            result = (key != fromId);
+        }
+
+        else if (key == fromId){
+            System.out.println("KEY is equal with bounds");
+            result = true;
+        }
+
+        // interval does not cross zero -> compare with both bounds
+        else if (fromId < toId) {
+            System.out.println("fromid<toid");
+            result = ((key > fromId) && (key < toId));
+        }
+
+        // interval crosses zero -> split interval at zero
+        else {
+            boolean lowerInterval = ((key > fromId) && (key <= MAX_ID));
+            System.out.println("LOWERINTERVAL: " + lowerInterval);
+            boolean lowerTerminationCondition = (fromId != MAX_ID);
+            System.out.println("LOWERTERMINATION: " + lowerTerminationCondition);
+            boolean upperInterval = ((key >= 0) && (key < toId));
+            System.out.println("UPPER INTERVAL: " + upperInterval);
+            boolean upperTerminationCondition = (0 != toId);
+            System.out.println("UPPER TERMINATION: " + upperTerminationCondition);
+
+            result = ((lowerInterval && lowerTerminationCondition) || (upperInterval && upperTerminationCondition));
+            System.out.println("FINAL: " + result);
+        }
+
+        return result;
     }
 
     private void insertToDHT(String itemName) {
@@ -278,32 +333,6 @@ public class DhtNode implements Serializable {
         return false;
     }
 
-    public boolean isInInterval(int key, int fromId, int toId) {
-        boolean result;
-        // both interval bounds are equal -> calculate out of equals
-        if (fromId == toId) {
-            result = false;
-        }
-
-        // interval does not cross zero -> compare with both bounds
-        else if (fromId < toId) {
-            result = ((key > fromId) && (key < toId));
-        }
-
-        // interval crosses zero -> split interval at zero
-        else {
-            boolean lowerInterval = ((key > fromId) && (key <= MAX_ID));
-            boolean lowerTerminationCondition = (fromId != MAX_ID);
-            boolean upperInterval = ((key >= 0) && (key < toId));
-            boolean upperTerminationCondition = (0 != toId);
-
-            result = ((lowerInterval && lowerTerminationCondition) || (upperInterval && upperTerminationCondition));
-        }
-
-        return result;
-    }
-
-
     public String getPropFileName() {
         return propFileName;
     }
@@ -344,8 +373,6 @@ public class DhtNode implements Serializable {
         System.out.println("nodeName: " + nodeName + " - port: " + port + " - referenceNodePort: " + referenceNodePort + " - isSetup:" + isSetup + " - isFirst:" + isFirst);
     }
 
-
-
     public int getNodeId() {
         return nodeId;
     }
@@ -372,5 +399,9 @@ public class DhtNode implements Serializable {
 
     public static Queue<DhtMessage> getMessageQueue() {
         return messageQueue;
+    }
+
+    public NodeRecord toNodeRecord(){
+        return new NodeRecord(this.getNodeId(), this.getPort());
     }
 }

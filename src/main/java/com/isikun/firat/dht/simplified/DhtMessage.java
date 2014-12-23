@@ -5,6 +5,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import com.google.gson.Gson;
 
+import javax.xml.soap.Node;
+
 /**
  * Created by hexenoid on 10/13/14.
  */
@@ -26,9 +28,9 @@ public class DhtMessage implements Serializable {
     public static final int ACTION_ENTRY = 2;
     public static final int ACTION_ACK = 3;
     public static final int ACTION_FIND = 4;
+    public static final int ACTION_UPDATE = 5;
     public static final int ACTION_FILE_SEND = 6;
     public static final int ACTION_BOOTSTRAPPING = 1;
-    public static final int ACTION_UPDATE = 5;
     public static final int ACTION_ERROR = 666;
 
     public DhtMessage() {
@@ -218,5 +220,13 @@ public class DhtMessage implements Serializable {
 
     public void setCallback(String callback) {
         this.callback = callback;
+    }
+
+    public NodeRecord toNodeRecord(){
+        return new NodeRecord(this.getFromNodeId(), this.getFromPort());
+    }
+
+    public NodeRecord payloadToNodeRecord(){
+        return NodeRecord.deserialize(this.getPayLoad());
     }
 }

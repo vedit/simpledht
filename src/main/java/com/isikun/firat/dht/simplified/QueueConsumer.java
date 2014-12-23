@@ -14,11 +14,12 @@ public class QueueConsumer implements Runnable {
     }
 
     @Override
-    public void run() {
+    public synchronized void run() {
         while(true){
             if(queue.peek() != null){
                 DhtMessage message = queue.poll();
                 message.sendMessage();
+                System.out.println("!!!===SENT MESSAGE FROM QUEUE===!!!\n" + message);
             }
             try{
                 Thread.sleep(1000);
