@@ -60,7 +60,6 @@ public class DhtNode implements Serializable {
                     new java.util.TimerTask() {
                         @Override
                         public void run() {
-                            System.out.println("TIMERDAMIYIZ GENCLER");
                             socketServer = ServerThread.getInstance();
 //                        new Thread(socketServer).start();
                             consumer = new QueueConsumer(messageQueue);
@@ -87,6 +86,7 @@ public class DhtNode implements Serializable {
         NodeRecord finger = fingerTable.getClosestPrecedingNode(k);
         System.out.println("SUCC\nPREDECESSOR:" + predecessor);
         System.out.println("SUCCESSOR:" + fingerTable);
+        System.out.println("FINGER:" + finger);
         System.out.println("K:" + k);
         if (this.toNodeRecord().compareTo(fingerTable.getFirst()) == 0 && this.toNodeRecord().compareTo(predecessor) == 0) { // Init optimization
             System.out.println("SUCCC1");
@@ -111,29 +111,13 @@ public class DhtNode implements Serializable {
         return successorNode;
     }
 
-    public NodeRecord pred() {
-        return predecessor;
-    }
-
-    private int lookup(int k) {
-        return 0;
-    }
-
-    private int insert(String itemName) {
-        return 0;
-    }
-
     private boolean enterRing() {
         boolean result = false;
         DhtMessage initQuery = DhtMessage.makeEntry(referenceNodePort);
         DhtMessage response = initQuery.sendMessage();
+        fingerTable.stabilize();
         processUpdateAction(response);
         return result;
-    }
-
-    private int leaveRing() {
-
-        return 0;
     }
 
     public synchronized DhtMessage bootstrapNode(DhtMessage message) {
@@ -181,7 +165,7 @@ public class DhtNode implements Serializable {
                     System.out.println("Node " + nodeId + " successor is now " + finger.getNodeId());
                     // Let our previous successor know its new pred
                     DhtMessage updateSuccessor;
-                    fingerTable.insert(request.payloadToNodeRecord());
+                    fingerTable.insert(request.payloadToNodeRecord(), fingerTable.getClosestPrecedingNode(request.payloadToNodeRecord().getNodeId()).getNodeId());
                     if (finger.compareTo(this.toNodeRecord()) == 0) {
                         updateSuccessor = DhtMessage.updatePredecessor(prevSuccessor, finger.serialize());
                     } else { //Initialization handling

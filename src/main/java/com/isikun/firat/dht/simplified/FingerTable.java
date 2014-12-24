@@ -12,11 +12,7 @@ public class FingerTable {
         for (int i = 0; i < fingerTable.length; i++) {
             fingerTable[i] = node.toNodeRecord();
         }
-
-        System.out.println("!!!!constructor!!!!");
         System.out.println(this);
-        System.out.println("====constructor====");
-
     }
 
     public NodeRecord getClosestPrecedingNode(int k) {
@@ -36,16 +32,18 @@ public class FingerTable {
     public synchronized void stabilize() {
         DhtNode node = DhtNode.getInstance();
         for (int i = 0; i < fingerTable.length; i++) {
-            fingerTable[i] = node.succ((node.getNodeId() + (int) Math.pow(2, i)) % DhtNode.MAX_NODES); //pow(2, i-1) olacakti 0 based olmasaydi
+            System.out.println("Calculating finger table for:" + ((node.getNodeId() + (int) Math.pow(2, i))% DhtNode.MAX_NODES));
+            this.insert(node.succ(((node.getNodeId() + (int) Math.pow(2, i))% DhtNode.MAX_NODES)), i); //pow(2, i-1) olacakti 0 based olmasaydi
         }
     }
 
-    public synchronized boolean insert(NodeRecord record) {
+    public synchronized boolean insert(NodeRecord record, int index) {
         boolean result = false;
+//        fingerTable[index] = record;
         for (int i = 1; i < fingerTable.length; i++) {
             if (Utils.isInInterval(record.getNodeId(), fingerTable[i - 1].getNodeId(), fingerTable[i].getNodeId()) && i > 0) {
                 fingerTable[i - 1] = record;
-                System.out.println("=========== INSERTED :=> " + record);
+                System.out.println("=0=0=0=0=0=0=0=0=::INSERTED::=> " + record);
                 result = true;
             }
         }
