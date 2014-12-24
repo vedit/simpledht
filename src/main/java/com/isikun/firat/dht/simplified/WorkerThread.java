@@ -5,10 +5,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+
 // Thread for sending messages
 public class WorkerThread implements Runnable {
 
-    private Socket clientSocket;
+    private final Socket clientSocket;
 
     public WorkerThread(Socket s) {
         clientSocket = s;
@@ -47,7 +48,7 @@ public class WorkerThread implements Runnable {
         }
 
         socketOut.println(DhtMessage.serialize(response));
-        System.out.println(node.getNodeId() + " recieved from "+ request.getFromNodeId() +" at port:"+ clientSocket.getPort() + " localport:" + clientSocket.getLocalPort() +": \n\t\"" + request + "\"");
+        System.out.println(node.getNodeId() + " recieved from " + request.getFromNodeId() + " at port:" + clientSocket.getPort() + " localport:" + clientSocket.getLocalPort() + ": \n\t\"" + request + "\"");
         System.out.println(node.getNodeId() + " sent: \n\t\"" + response + "\"");
 
 
@@ -63,8 +64,6 @@ public class WorkerThread implements Runnable {
 
     public DhtMessage processResponse(DhtMessage request) {
         DhtNode node = DhtNode.getInstance();
-        System.out.println("SUCCESSOR:" + node.getSuccessor());
-        System.out.println("PRECESSOR:" + node.getPredecessor());
         DhtMessage response = null;
         switch (request.getAction()) {
             case DhtMessage.ACTION_ENTRY:
@@ -87,7 +86,7 @@ public class WorkerThread implements Runnable {
             case DhtMessage.ACTION_FILE_SEND:
                 ezLog(node.getNodeId(), request.getFromNodeId(), "FILE");
 //                node.getMessageQueue().offer(node.processUpdateAction(request));
-                if(node.processReceivedPayload(request.getPayLoad())){
+                if (node.processReceivedPayload(request.getPayLoad())) {
                     response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
                 } else {
                     response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ERROR, node.getPort(), request.getFromPort());
@@ -96,9 +95,9 @@ public class WorkerThread implements Runnable {
 
             case DhtMessage.ACTION_FIND: //SUCCESSOR QUERY
                 ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
-                if(request.getType() == DhtMessage.TYPE_SUCCESSOR){
+                if (request.getType() == DhtMessage.TYPE_SUCCESSOR) {
                     NodeRecord successor = node.succ(Integer.parseInt(request.getPayLoad()));
-                    if(successor.compareTo(node.toNodeRecord()) == 0){
+                    if (successor.compareTo(node.toNodeRecord()) == 0) {
                         DhtMessage updatePred = new DhtMessage(node.getNodeId(), node.getNodeId(), DhtMessage.ACTION_UPDATE, node.getPort(), node.getPort(), DhtMessage.TYPE_PREDECESSOR, request.toNodeRecord().serialize());
                         DhtNode.getMessageQueue().offer(updatePred);
                     }
@@ -112,7 +111,7 @@ public class WorkerThread implements Runnable {
                 System.out.println(request.getFromNodeId());
                 break;
             case DhtMessage.ACTION_LEAVING:
-                ezLog(node.getNodeId(),request.getFromNodeId(), "LEAVE");
+                ezLog(node.getNodeId(), request.getFromNodeId(), "LEAVE");
                 break;
             case DhtMessage.ACTION_ACK:
                 ezLog(node.getNodeId(), request.getFromNodeId(), "ACK");
@@ -122,8 +121,8 @@ public class WorkerThread implements Runnable {
         return response;
     }
 
-    public void ezLog(int node, int from, String action){
-        System.out.println("NODE " + node + " RECEIVED "+ action+" FROM " + from);
+    public void ezLog(int node, int from, String action) {
+        System.out.println("NODE " + node + " RECEIVED " + action + " FROM " + from);
     }
 
 }

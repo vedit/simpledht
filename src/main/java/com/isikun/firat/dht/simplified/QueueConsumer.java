@@ -7,23 +7,23 @@ import java.util.Queue;
  */
 public class QueueConsumer implements Runnable {
 
-    Queue<DhtMessage> queue;
+    final Queue<DhtMessage> queue;
 
-    public QueueConsumer (Queue queue){
+    public QueueConsumer(Queue queue) {
         this.queue = queue;
     }
 
     @Override
     public synchronized void run() {
-        while(true){
-            if(queue.peek() != null){
+        while (true) {
+            if (queue.peek() != null) {
                 DhtMessage message = queue.poll();
                 message.sendMessage();
                 System.out.println("!!!===SENT MESSAGE FROM QUEUE===!!!\n" + message);
             }
-            try{
+            try {
                 Thread.sleep(1000);
-            } catch (InterruptedException e){
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }

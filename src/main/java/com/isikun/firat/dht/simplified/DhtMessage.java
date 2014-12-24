@@ -3,6 +3,7 @@ package com.isikun.firat.dht.simplified;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+
 import com.google.gson.Gson;
 
 import javax.xml.soap.Node;
@@ -103,7 +104,7 @@ public class DhtMessage implements Serializable {
         } catch (UnknownHostException e) { //if serverName cannot be resolved to an address
             System.out.println("Who is " + host + "?");
             e.printStackTrace();
-        }  catch (IOException e){ //put it back to queue
+        } catch (IOException e) { //put it back to queue
             System.out.println("Cannot Connect to " + this.getToNodeId() + ":" + this.getToPort());
             DhtNode.getMessageQueue().offer(this); //
         }
@@ -133,14 +134,14 @@ public class DhtMessage implements Serializable {
         return response;
     }
 
-    public static String serialize(DhtMessage message){
+    public static String serialize(DhtMessage message) {
         Gson gson = new Gson();
         String json = gson.toJson(message);
 //        System.out.println(json);
         return json;
     }
 
-    public static DhtMessage deserialize(String message){
+    public static DhtMessage deserialize(String message) {
         Gson gson = new Gson();
 //        System.out.println(message);
         return gson.fromJson(message, DhtMessage.class);
@@ -222,11 +223,11 @@ public class DhtMessage implements Serializable {
         this.callback = callback;
     }
 
-    public NodeRecord toNodeRecord(){
+    public NodeRecord toNodeRecord() {
         return new NodeRecord(this.getFromNodeId(), this.getFromPort());
     }
 
-    public NodeRecord payloadToNodeRecord(){
+    public NodeRecord payloadToNodeRecord() {
         return NodeRecord.deserialize(this.getPayLoad());
     }
 }

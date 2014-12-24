@@ -3,6 +3,7 @@ package com.isikun.firat.dht.simplified;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+
 /**
  * Created by hexenoid on 11/19/14.
  */
@@ -26,7 +27,7 @@ public class ServerThread implements Runnable {
         try {
             //initialize server socket
             serverSocket = new ServerSocket(port);
-            System.out.println("Server socket initialized at "+ port +".\n");
+            System.out.println("Server socket initialized at " + port + ".\n");
         } catch (IOException e) { //if this port is busy, an IOException is fired
             System.out.println("Cannot listen on port " + port);
             e.printStackTrace();
@@ -59,7 +60,7 @@ public class ServerThread implements Runnable {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                System.out.println("Worker Thread is dead for " + DhtNode.getInstance().getNodeId() + " at " + + clientSocket.getPort());
+                System.out.println("Worker Thread is dead for " + DhtNode.getInstance().getNodeId() + " at " + +clientSocket.getPort());
 
             }
         } finally {

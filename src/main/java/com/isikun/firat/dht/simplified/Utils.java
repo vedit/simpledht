@@ -104,14 +104,14 @@ public class Utils {
         return result;
     }
 
-    public static String encodePayload(String payload){
+    public static String encodePayload(String payload) {
         byte[] encodedBytes = Base64.encodeBase64(payload.getBytes());
         String encodedPayload = new String(encodedBytes);
         System.out.println("encodedBytes: " + encodedPayload);
         return encodedPayload;
     }
 
-    public static String decodePayload(String encodedBytes){
+    public static String decodePayload(String encodedBytes) {
         byte[] decodedPayload = Base64.decodeBase64(encodedBytes);
         String payload = new String(decodedPayload);
         System.out.println("decodedBytes: " + payload);

@@ -1,12 +1,13 @@
 package com.isikun.firat.dht.simplified;
 
 import java.io.Serializable;
+
 import com.google.gson.Gson;
 
 /**
  * Created by hexenoid on 11/23/14.
  */
-public class NodeRecord implements Serializable, Comparable<NodeRecord>{
+public class NodeRecord implements Serializable, Comparable<NodeRecord> {
     private int nodeId;
     private int port;
 
@@ -34,21 +35,21 @@ public class NodeRecord implements Serializable, Comparable<NodeRecord>{
         this.port = port;
     }
 
-    public String serialize(){
+    public String serialize() {
         Gson gson = new Gson();
         String json = gson.toJson(this);
 //        System.out.println(json);
         return json;
     }
 
-    public static NodeRecord deserialize(String noderecord){
+    public static NodeRecord deserialize(String noderecord) {
         Gson gson = new Gson();
 //        System.out.println(message);
         return gson.fromJson(noderecord, NodeRecord.class);
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return this.serialize();
     }
 
@@ -56,7 +57,7 @@ public class NodeRecord implements Serializable, Comparable<NodeRecord>{
     // Negative when second is bigger
     // 0 when they are the same
     @Override
-    public int compareTo(NodeRecord nodeRecord){
+    public int compareTo(NodeRecord nodeRecord) {
         return nodeId - nodeRecord.getNodeId();
     }
 
