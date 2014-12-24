@@ -19,6 +19,6 @@ mvn clean install
 
 launch_node 1
 launch_node 2
-launch_node 4
 launch_node 3
+launch_node 4
 
