@@ -1,8 +1,8 @@
 package com.isikun.firat.dht.simplified;
 
-import java.io.Serializable;
-
 import com.google.gson.Gson;
+
+import java.io.Serializable;
 
 /**
  * Created by hexenoid on 11/23/14.
@@ -38,7 +38,6 @@ public class NodeRecord implements Serializable, Comparable<NodeRecord> {
     public String serialize() {
         Gson gson = new Gson();
         String json = gson.toJson(this);
-//        System.out.println(json);
         return json;
     }
 

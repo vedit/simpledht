@@ -2,16 +2,11 @@ package com.isikun.firat.dht.simplified;
 
 import org.apache.commons.codec.binary.Base64;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
-import java.util.Random;
-import java.security.SecureRandom;
 
 public class Utils {
 
@@ -21,6 +16,90 @@ public class Utils {
             throw new Exception(propName + " is null");
         }
         return property;
+    }
+
+    public static String readFile(String fileName, String folder) {
+        String fileContents = null;
+        try (BufferedReader br = new BufferedReader(new FileReader(folder + "/" + fileName))) {
+            StringBuilder sb = new StringBuilder();
+            String line = br.readLine();
+
+            while (line != null) {
+                sb.append(line);
+                sb.append(System.lineSeparator());
+                line = br.readLine();
+            }
+            fileContents = sb.toString();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return fileContents;
+    }
+
+    public static boolean saveFile(String[] payload, String folder) {
+        boolean result = false;
+        try {
+            PrintWriter writer = new PrintWriter(folder + "/" + payload[0], "UTF-8");
+            writer.println(Utils.decodePayload(payload[1]));
+            writer.close();
+            result = true;
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    public static boolean deleteFile(String fileName, String folder) {
+        boolean result = false;
+        try {
+            File file = new File(folder + "/" + fileName);
+            if (file.delete()) {
+                System.out.println(file.getName() + " is deleted!");
+                result = true;
+            } else {
+                System.out.println("Delete operation is failed.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+
+    public static boolean isInInterval(int key, int fromId, int toId) {
+        System.out.println("key:" + key + " from:" + fromId + " to:" + toId);
+        boolean result;
+        // both interval bounds are equal -> calculate out of equals
+        if (fromId == toId) {
+            System.out.println("EQUAL INTERVAL");
+            result = (key != fromId);
+        } else if (key == fromId) {
+            System.out.println("KEY is equal with bounds");
+            result = true;
+        }
+
+        // interval does not cross zero -> compare with both bounds
+        else if (fromId < toId) {
+            System.out.println("fromid<toid");
+            result = ((key > fromId) && (key < toId));
+        }
+
+        // interval crosses zero -> split interval at zero
+        else {
+            boolean lowerInterval = ((key > fromId) && (key <= DhtNode.MAX_ID));
+            System.out.println("LOWERINTERVAL: " + lowerInterval);
+            boolean lowerTerminationCondition = (fromId != DhtNode.MAX_ID);
+            System.out.println("LOWERTERMINATION: " + lowerTerminationCondition);
+            boolean upperInterval = ((key >= 0) && (key < toId));
+            System.out.println("UPPER INTERVAL: " + upperInterval);
+            boolean upperTerminationCondition = (0 != toId);
+            System.out.println("UPPER TERMINATION: " + upperTerminationCondition);
+
+            result = ((lowerInterval && lowerTerminationCondition) || (upperInterval && upperTerminationCondition));
+            System.out.println("FINAL: " + result);
+        }
+
+        return result;
     }
 
     public static int getChecksum(String input, boolean isFile) {
@@ -116,24 +195,5 @@ public class Utils {
         String payload = new String(decodedPayload);
         System.out.println("decodedBytes: " + payload);
         return payload;
-    }
-
-    public static int randInt(int min, int max) {
-
-        // NOTE: Usually this should be a field rather than a method
-        // variable so that it is not re-seeded every call.
-        Random rand = new Random();
-
-        // nextInt is normally exclusive of the top value,
-        // so add 1 to make it inclusive
-        int randomNum = rand.nextInt((max - min) + 1) + min;
-
-        return randomNum;
-    }
-
-
-    public static String randomHash() {
-        SecureRandom random = new SecureRandom();
-        return new BigInteger(130, random).toString(32);
     }
 }

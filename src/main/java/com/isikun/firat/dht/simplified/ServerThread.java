@@ -12,16 +12,30 @@ public class ServerThread implements Runnable {
 
     private int port;
 
-    public ServerThread(int port) {
+    private static volatile ServerThread instance = null;
+
+    private ServerThread(int port) {
         this.port = port;
     }
 
+    public static ServerThread getInstance() {
+        if (instance == null) {
+            synchronized (ServerThread.class) {
+                if (instance == null) {
+                    instance = new ServerThread(DhtNode.getInstance().getPort());
+                    new Thread(instance).start();
+                }
+            }
+        }
+        return instance;
+    }
+
     @Override
-    public void run() {
+    public synchronized void run() {
         startServer();
     }
 
-    public void startServer() {
+    public synchronized void startServer() {
         ServerSocket serverSocket = null;
 
         try {
@@ -72,5 +86,6 @@ public class ServerThread implements Runnable {
             }
         }
     }
+
 
 }

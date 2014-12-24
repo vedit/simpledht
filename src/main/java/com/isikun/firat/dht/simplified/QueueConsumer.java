@@ -14,7 +14,7 @@ public class QueueConsumer implements Runnable {
     }
 
     @Override
-    public synchronized void run() {
+    public void run() {
         while (true) {
             if (queue.peek() != null) {
                 DhtMessage message = queue.poll();

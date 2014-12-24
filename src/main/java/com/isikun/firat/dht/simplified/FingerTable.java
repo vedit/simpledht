@@ -1,7 +1,5 @@
 package com.isikun.firat.dht.simplified;
 
-import com.google.gson.Gson;
-
 /**
  * Created by hexenoid on 12/23/14.
  */
@@ -14,36 +12,62 @@ public class FingerTable {
         for (int i = 0; i < fingerTable.length; i++) {
             fingerTable[i] = node.toNodeRecord();
         }
-        for(NodeRecord row: fingerTable){
-            System.out.println(row);
-        }
-//        System.out.println(fingerTable);
+
+        System.out.println("!!!!constructor!!!!");
+        System.out.println(this);
+        System.out.println("====constructor====");
+
     }
 
     public NodeRecord getClosestPrecedingNode(int k) {
         NodeRecord result = DhtNode.getInstance().toNodeRecord();
-        for (int i = 0; i < fingerTable.length; i++) {
-            if (fingerTable[i].getNodeId() > k && i > 0) {
+        for (int i = 1; i < fingerTable.length; i++) {
+            if (Utils.isInInterval(k, fingerTable[i - 1].getNodeId(), fingerTable[i].getNodeId()) && i > 0) {
                 result = fingerTable[i - 1];
             }
         }
         return result;
     }
 
-    public NodeRecord getFirst(){
+    public NodeRecord getFirst() {
         return fingerTable[0];
     }
 
     public synchronized void stabilize() {
         DhtNode node = DhtNode.getInstance();
         for (int i = 0; i < fingerTable.length; i++) {
-            fingerTable[i] = node.succ(node.getNodeId() + (int) Math.pow(2, i)); //pow(2, i-1) olacakti 0 based olmasaydi
+            fingerTable[i] = node.succ((node.getNodeId() + (int) Math.pow(2, i)) % DhtNode.MAX_NODES); //pow(2, i-1) olacakti 0 based olmasaydi
         }
     }
 
-    public String toString(){
-        Gson gson = new Gson();
-        String json = gson.toJson(fingerTable);
-        return json;
+    public synchronized boolean insert(NodeRecord record) {
+        boolean result = false;
+        for (int i = 1; i < fingerTable.length; i++) {
+            if (Utils.isInInterval(record.getNodeId(), fingerTable[i - 1].getNodeId(), fingerTable[i].getNodeId()) && i > 0) {
+                fingerTable[i - 1] = record;
+                System.out.println("=========== INSERTED :=> " + record);
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    public boolean Contains(NodeRecord record) {
+        boolean result = false;
+        for (NodeRecord row : fingerTable) {
+            if (row.compareTo(record) == 0) {
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    public String toString() {
+        String stringRepresentation = "FingerTable:\n[";
+        for (NodeRecord row : fingerTable) {
+            stringRepresentation += row.serialize() + "\n";
+        }
+        stringRepresentation += "]";
+        return stringRepresentation;
     }
 }

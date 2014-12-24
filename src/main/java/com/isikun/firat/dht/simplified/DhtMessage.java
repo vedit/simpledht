@@ -1,12 +1,10 @@
 package com.isikun.firat.dht.simplified;
 
+import com.google.gson.Gson;
+
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
-
-import com.google.gson.Gson;
-
-import javax.xml.soap.Node;
 
 /**
  * Created by hexenoid on 10/13/14.
@@ -25,14 +23,16 @@ public class DhtMessage implements Serializable {
     public static final int TYPE_SUCCESSOR = 1;
     public static final int TYPE_PREDECESSOR = 2;
 
-    public static final int ACTION_LEAVING = -1;
-    public static final int ACTION_ENTRY = 2;
     public static final int ACTION_ACK = 3;
     public static final int ACTION_FIND = 4;
     public static final int ACTION_UPDATE = 5;
     public static final int ACTION_FILE_SEND = 6;
     public static final int ACTION_BOOTSTRAPPING = 1;
     public static final int ACTION_ERROR = 666;
+
+    public static final int STATE_FOUND = 7;
+    public static final int STATE_LEAVING = -1;
+    public static final int STATE_ENTRY = 2;
 
     public DhtMessage() {
 
@@ -113,7 +113,6 @@ public class DhtMessage implements Serializable {
             socketOut.println(DhtMessage.serialize(this));
             try {
                 response = DhtMessage.deserialize(socketIn.readLine());
-//                System.out.println(response);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -134,16 +133,115 @@ public class DhtMessage implements Serializable {
         return response;
     }
 
+    public static DhtMessage findSuccessor(NodeRecord to, String payLoad) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_FIND, from.getPort(), to.getPort(), DhtMessage.TYPE_SUCCESSOR, payLoad);
+    }
+
+    public static DhtMessage getSuccessorsPrecessor(NodeRecord to) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), from.getNodeId(), DhtMessage.ACTION_FIND, from.getPort(), to.getPort(), DhtMessage.TYPE_PREDECESSOR);
+    }
+
+    public static DhtMessage sendFile(NodeRecord to, String payLoad) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_FILE_SEND, from.getPort(), to.getPort(), DhtMessage.TYPE_SUCCESSOR, payLoad);
+    }
+
+    public static DhtMessage updateSuccessor(NodeRecord to, String payLoad) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_UPDATE, from.getPort(), to.getPort(), DhtMessage.TYPE_SUCCESSOR, payLoad);
+    }
+
+    public static DhtMessage updatePredecessor(NodeRecord to, String payLoad) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_UPDATE, from.getPort(), to.getPort(), DhtMessage.TYPE_PREDECESSOR, payLoad);
+    }
+
+    public static DhtMessage sendAck(NodeRecord to) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_ACK, from.getPort(), to.getPort());
+    }
+
+    public static DhtMessage sendError(NodeRecord to) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), to.getNodeId(), DhtMessage.ACTION_ERROR, from.getPort(), to.getPort());
+    }
+
+    public static DhtMessage makeEntry(int referenceNodePort) {
+        NodeRecord from = DhtNode.getInstance().toNodeRecord();
+        return new DhtMessage(from.getNodeId(), from.getNodeId(), DhtMessage.STATE_ENTRY, from.getPort(), referenceNodePort, DhtMessage.TYPE_SUCCESSOR, from.serialize());
+    }
+
+    public static DhtMessage processResponse(DhtMessage request) {
+        DhtNode node = DhtNode.getInstance();
+        DhtMessage response = null;
+        node.checkIfNeighbor(request);
+        switch (request.getAction()) {
+            case DhtMessage.STATE_ENTRY:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "ENTRY");
+                System.out.println("1");
+                response = node.bootstrapNode(request);
+                DhtNode.getMessageQueue().offer(response);
+                break;
+            case DhtMessage.ACTION_UPDATE:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "UPDATE");
+                response = node.processUpdateAction(request);
+                DhtNode.getMessageQueue().offer(response);
+                break;
+            case DhtMessage.ACTION_FILE_SEND:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "FILE");
+                if (node.processReceivedPayload(request.getPayLoad())) {
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                } else {
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ERROR, node.getPort(), request.getFromPort());
+                }
+                break;
+            case DhtMessage.ACTION_FIND: //SUCCESSOR QUERY
+                ezLog(node.getNodeId(), request.getFromNodeId(), "FIND");
+                if (request.getType() == DhtMessage.TYPE_SUCCESSOR) {
+                    System.out.println("SUCCESSOR FIND?");
+                    NodeRecord successor = node.succ(Integer.parseInt(request.getPayLoad()));
+                    if (successor.compareTo(node.toNodeRecord()) == 0) {
+                        DhtMessage updatePred = new DhtMessage(node.getNodeId(), node.getNodeId(), DhtMessage.ACTION_UPDATE, node.getPort(), node.getPort(), DhtMessage.TYPE_PREDECESSOR, request.toNodeRecord().serialize());
+                        DhtNode.getMessageQueue().offer(updatePred);
+                    }
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.STATE_FOUND, node.getPort(), request.getFromPort(), DhtMessage.TYPE_SUCCESSOR, successor.serialize());
+                } else if (request.getType() == DhtMessage.TYPE_PREDECESSOR) {
+                    System.out.println("PREDECESSOR FIND?");
+                    response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.STATE_FOUND, node.getPort(), request.getFromPort(), DhtMessage.TYPE_PREDECESSOR, node.getPredecessor().serialize());
+                }
+                break;
+            case DhtMessage.STATE_FOUND:
+                response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                break;
+            case DhtMessage.ACTION_BOOTSTRAPPING:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "BOOTSTRAP");
+                System.out.println(request.getFromNodeId());
+                break;
+            case DhtMessage.STATE_LEAVING:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "LEAVE");
+                break;
+            case DhtMessage.ACTION_ACK:
+                ezLog(node.getNodeId(), request.getFromNodeId(), "ACK");
+                response = new DhtMessage(node.getNodeId(), request.getFromNodeId(), DhtMessage.ACTION_ACK, node.getPort(), request.getFromPort());
+                break;
+        }
+        return response;
+    }
+
+    public static void ezLog(int node, int from, String action) {
+        System.out.println("NODE " + node + " RECEIVED " + action + " FROM " + from);
+    }
+
     public static String serialize(DhtMessage message) {
         Gson gson = new Gson();
         String json = gson.toJson(message);
-//        System.out.println(json);
         return json;
     }
 
     public static DhtMessage deserialize(String message) {
         Gson gson = new Gson();
-//        System.out.println(message);
         return gson.fromJson(message, DhtMessage.class);
     }
 
