@@ -43,25 +43,25 @@
     </pluginRepositories>
 
     <build>
-        <sourceDirectory>/home/hexenoid/ops/projects/simpledht/src/main/java</sourceDirectory>
-        <scriptSourceDirectory>/home/hexenoid/ops/projects/simpledht/src/main/scripts</scriptSourceDirectory>
-        <testSourceDirectory>/home/hexenoid/ops/projects/simpledht/src/test/java</testSourceDirectory>
-        <outputDirectory>/home/hexenoid/ops/projects/simpledht/target/classes</outputDirectory>
-        <testOutputDirectory>/home/hexenoid/ops/projects/simpledht/target/test-classes</testOutputDirectory>
+        <sourceDirectory>src/main/java</sourceDirectory>
+        <scriptSourceDirectory>src/main/scripts</scriptSourceDirectory>
+        <testSourceDirectory>src/test/java</testSourceDirectory>
+        <outputDirectory>target/classes</outputDirectory>
+        <testOutputDirectory>target/test-classes</testOutputDirectory>
 
         <resources>
             <resource>
-                <directory>/home/hexenoid/ops/projects/simpledht/src/main/resources</directory>
+                <directory>src/main/resources</directory>
             </resource>
         </resources>
 
         <testResources>
             <testResource>
-                <directory>/home/hexenoid/ops/projects/simpledht/src/test/resources</directory>
+                <directory>src/test/resources</directory>
             </testResource>
         </testResources>
 
-        <directory>/home/hexenoid/ops/projects/simpledht/target</directory>
+        <directory>target</directory>
         <finalName>simpledht-1.0-SNAPSHOT</finalName>
 
         <pluginManagement>
@@ -228,7 +228,7 @@
                             <goal>site</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>/home/hexenoid/ops/projects/simpledht/target/site</outputDirectory>
+                            <outputDirectory>target/site</outputDirectory>
                             <reportPlugins>
                                 <reportPlugin>
                                     <groupId>org.apache.maven.plugins</groupId>
@@ -244,7 +244,7 @@
                             <goal>deploy</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>/home/hexenoid/ops/projects/simpledht/target/site</outputDirectory>
+                            <outputDirectory>target/site</outputDirectory>
                             <reportPlugins>
                                 <reportPlugin>
                                     <groupId>org.apache.maven.plugins</groupId>
@@ -255,7 +255,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <outputDirectory>/home/hexenoid/ops/projects/simpledht/target/site</outputDirectory>
+                    <outputDirectory>target/site</outputDirectory>
                     <reportPlugins>
                         <reportPlugin>
                             <groupId>org.apache.maven.plugins</groupId>
@@ -268,6 +268,6 @@
     </build>
 
     <reporting>
-        <outputDirectory>/home/hexenoid/ops/projects/simpledht/target/site</outputDirectory>
+        <outputDirectory>target/site</outputDirectory>
     </reporting>
 </project>
